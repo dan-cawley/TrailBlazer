@@ -19,6 +19,13 @@ const days = [
 
 export function CourseForm({ studentId, defaultEndDate }: { studentId: string; defaultEndDate: string }) {
   const [source, setSource] = useState("MANUAL");
+  const [meetingDays, setMeetingDays] = useState<string[]>(days.filter(([value]) => value !== "FRIDAY").map(([value]) => value));
+
+  const toggleMeetingDay = (value: string) => {
+    setMeetingDays((current) =>
+      current.includes(value) ? current.filter((day) => day !== value) : [...current, value],
+    );
+  };
 
   return (
     <form action={createCourse} className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -41,7 +48,15 @@ export function CourseForm({ studentId, defaultEndDate }: { studentId: string; d
           <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
             {days.map(([value, label]) => (
               <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <Checkbox name="meetingDays" value={value} defaultChecked={value !== "FRIDAY"} />
+                <Checkbox
+                  name="meetingDays"
+                  value={value}
+                  checked={meetingDays.includes(value)}
+                  onCheckedChange={(checked) => {
+                    if (checked) toggleMeetingDay(value);
+                    else setMeetingDays((current) => current.filter((day) => day !== value));
+                  }}
+                />
                 {label}
               </label>
             ))}

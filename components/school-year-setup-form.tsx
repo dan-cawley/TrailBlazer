@@ -43,8 +43,20 @@ function SubmitButton() {
 export function SchoolYearSetupForm({ initial }: { initial?: InitialSchoolYear }) {
   const [calendarSource, setCalendarSource] = useState(initial?.calendarSource ?? "TRAILBLAZER_DEFAULTS");
   const [customVacationEnabled, setCustomVacationEnabled] = useState(Boolean(initial?.customVacation));
-  const selectedDays = initial?.schoolDays ?? days.map(([value]) => value);
-  const vacationKinds = initial?.vacationKinds ?? ["THANKSGIVING", "CHRISTMAS", "SPRING_BREAK"];
+  const [selectedDays, setSelectedDays] = useState<string[]>(initial?.schoolDays ?? days.map(([value]) => value));
+  const [vacationKinds, setVacationKinds] = useState<string[]>(initial?.vacationKinds ?? ["THANKSGIVING", "CHRISTMAS", "SPRING_BREAK"]);
+
+  const toggleDay = (value: string) => {
+    setSelectedDays((current) =>
+      current.includes(value) ? current.filter((day) => day !== value) : [...current, value],
+    );
+  };
+
+  const toggleVacationKind = (kind: string) => {
+    setVacationKinds((current) =>
+      current.includes(kind) ? current.filter((value) => value !== kind) : [...current, kind],
+    );
+  };
 
   return (
     <form action={saveSchoolYear} className="space-y-8">
@@ -71,7 +83,15 @@ export function SchoolYearSetupForm({ initial }: { initial?: InitialSchoolYear }
             <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
               {days.map(([value, label]) => (
                 <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                  <Checkbox name="schoolDays" value={value} defaultChecked={selectedDays.includes(value)} />
+                  <Checkbox
+                    name="schoolDays"
+                    value={value}
+                    checked={selectedDays.includes(value)}
+                    onCheckedChange={(checked) => {
+                      if (checked) toggleDay(value);
+                      else setSelectedDays((current) => current.filter((day) => day !== value));
+                    }}
+                  />
                   {label.slice(0, 3)}
                 </label>
               ))}
@@ -141,7 +161,14 @@ export function SchoolYearSetupForm({ initial }: { initial?: InitialSchoolYear }
             ["springBreak", "SPRING_BREAK", "Spring Break"],
           ].map(([name, kind, label]) => (
             <label key={name} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm font-medium text-slate-800">
-              <Checkbox name={name} defaultChecked={vacationKinds.includes(kind)} />
+              <Checkbox
+                name={name}
+                checked={vacationKinds.includes(kind)}
+                onCheckedChange={(checked) => {
+                  if (checked) toggleVacationKind(kind);
+                  else setVacationKinds((current) => current.filter((value) => value !== kind));
+                }}
+              />
               {label}
             </label>
           ))}
