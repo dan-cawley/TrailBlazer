@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SchoolDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
+enum CalendarSource {
+  TRAILBLAZER_DEFAULTS
+  DISTRICT_UPLOAD
+}
+
+enum VacationKind {
+  THANKSGIVING
+  CHRISTMAS
+  SPRING_BREAK
+  CUSTOM
+}
+
+enum CurriculumSource {
+  TRAILBLAZER_LIBRARY
+  UPLOAD
+  MANUAL
+}
+
+enum AssignmentType {
+  LESSON
+  READING
+  QUIZ
+  TEST
+  LAB
+  ESSAY
+  PROJECT
+  DISCUSSION
+}
+
+enum AssignmentStatus {
+  NOT_STARTED
+  PARTIALLY_COMPLETED
+  COMPLETED
+}
+
+enum NotificationType {
+  ROLLOVER
+  LOCKED_ITEM
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+model SchoolYear {
+  id             String         @id @default(uuid())
+  ownerId        String
+  label          String
+  startDate      DateTime       @db.Date
+  endDate        DateTime       @db.Date
+  schoolDays     SchoolDay[]
+  calendarSource CalendarSource @default(TRAILBLAZER_DEFAULTS)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  vacations      Vacation[]
+  calendarUpload CalendarUpload?
+  students       Student[]
+  weekLocks      WeekLock[]
+
+  @@unique([ownerId, label])
+  @@index([ownerId])
+}
+
+model Student {
+  id           String      @id @default(uuid())
+  schoolYearId String
+  name         String
+  grade        String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  schoolYear   SchoolYear  @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  courses      Course[]
+  studentAccount StudentAccount?
+  attendanceRecords AttendanceRecord[]
+
+  @@index([schoolYearId])
+}
+
+model Course {
+  id            String      @id @default(uuid())
+  studentId     String
+  subject       String
+  title         String
+  meetingDays   SchoolDay[]
+  targetEndDate DateTime    @db.Date
+  parentNotes   String?
+  isLocked      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  curriculum    Curriculum?
+  scheduledAssignments ScheduledAssignment[]
+
+  @@index([studentId])
+}
+
+model Curriculum {
+  id           String           @id @default(uuid())
+  courseId     String           @unique
+  source       CurriculumSource
+  title        String
+  storagePath  String?
+  fileName     String?
+  mimeType     String?
+  sizeBytes    Int?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  units        Unit[]
+}
+
+model Unit {
+  id           String       @id @default(uuid())
+  curriculumId String
+  title        String
+  parentNotes  String?
+  isLocked     Boolean      @default(false)
+  position     Int
+  curriculum   Curriculum   @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  assignments  Assignment[]
+
+  @@unique([curriculumId, position])
+  @@index([curriculumId])
+}
+
+model Assignment {
+  id            String         @id @default(uuid())
+  unitId        String
+  title         String
+  type          AssignmentType
+  parentNotes   String?
+  estimatedMins Int?
+  optional      Boolean        @default(false)
+  position      Int
+  unit          Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  scheduledAssignments ScheduledAssignment[]
+
+  @@unique([unitId, position])
+  @@index([unitId])
+}
+
+model ScheduledAssignment {
+  id            String     @id @default(uuid())
+  courseId      String
+  assignmentId  String
+  scheduledDate DateTime   @db.Date
+  position      Int
+  status        AssignmentStatus @default(NOT_STARTED)
+  isLocked      Boolean    @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  course        Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  grade         GradeRecord?
+
+  @@unique([courseId, assignmentId])
+  @@index([courseId, scheduledDate])
+  @@index([assignmentId])
+}
+
+model StudentAccount {
+  id          String   @id @default(uuid())
+  studentId   String   @unique
+  authUserId  String?  @unique
+  email       String
+  inviteToken String   @unique
+  invitedAt   DateTime @default(now())
+  claimedAt   DateTime?
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model AttendanceRecord {
+  id        String           @id @default(uuid())
+  studentId String
+  date      DateTime         @db.Date
+  status    AttendanceStatus
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
+  @@index([studentId, date])
+}
+
+model GradeRecord {
+  id                    String              @id @default(uuid())
+  scheduledAssignmentId String              @unique
+  score                 Decimal             @db.Decimal(6, 2)
+  possiblePoints        Decimal             @db.Decimal(6, 2)
+  notes                 String?
+  recordedAt            DateTime            @default(now())
+  scheduledAssignment   ScheduledAssignment @relation(fields: [scheduledAssignmentId], references: [id], onDelete: Cascade)
+}
+
+model WeekLock {
+  id           String     @id @default(uuid())
+  schoolYearId String
+  weekStart    DateTime   @db.Date
+  createdAt    DateTime   @default(now())
+  schoolYear   SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolYearId, weekStart])
+  @@index([schoolYearId])
+}
+
+model NotificationPreference {
+  id               String   @id @default(uuid())
+  ownerId          String   @unique
+  rolloverEnabled  Boolean  @default(true)
+  planningEnabled  Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  ownerId     String
+  type        NotificationType
+  title       String
+  message     String
+  dedupeKey   String?          @unique
+  dismissedAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([ownerId, dismissedAt, createdAt])
+}
+
+model Vacation {
+  id           String       @id @default(uuid())
+  schoolYearId String
+  kind         VacationKind
+  label        String
+  startDate    DateTime?    @db.Date
+  endDate      DateTime?    @db.Date
+  schoolYear   SchoolYear   @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  @@index([schoolYearId])
+}
+
+model CalendarUpload {
+  id           String     @id @default(uuid())
+  schoolYearId String     @unique
+  storagePath  String
+  fileName     String
+  mimeType     String?
+  sizeBytes    Int
+  uploadedAt   DateTime   @default(now())
+  schoolYear   SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+}

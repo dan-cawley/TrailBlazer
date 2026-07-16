@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+
+# local environment files
+.env
+.env*.local
+
+# generated Prisma client
+/generated/
+
+# system files
+.DS_Store
+*.log

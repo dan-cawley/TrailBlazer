@@ -1,0 +1,17 @@
+import Link from "next/link";
+import { ClipboardCheck } from "lucide-react";
+
+import { recordAttendance } from "@/app/(app)/records-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { addDays, dateKey, formatDate, todayUtc, utcDate } from "@/lib/dates";
+import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
+
+export default async function AttendancePage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+  const [{ date }, supabase] = await Promise.all([searchParams, createClient()]);
+  const { data: { user } } = await supabase.auth.getUser();
+  const selectedDate = utcDate(date ?? "") ?? todayUtc();
+  const schoolYear = user ? await prisma.schoolYear.findFirst({ where: { ownerId: user.id }, orderBy: { updatedAt: "desc" }, include: { students: { orderBy: { createdAt: "asc" }, include: { attendanceRecords: { where: { date: selectedDate } } } } } }) : null;
+  return <main className="mx-auto w-full max-w-5xl px-4 py-10 pb-24 sm:px-6 sm:py-14"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-800">Records</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Attendance</h1><p className="mt-2 text-slate-600">Mark each student&apos;s learning-day status.</p></div><div className="flex gap-2"><Button asChild variant="outline"><Link href={`/attendance?date=${dateKey(addDays(selectedDate, -1))}`}>Previous</Link></Button><Button asChild variant="outline"><Link href={`/attendance?date=${dateKey(addDays(selectedDate, 1))}`}>Next</Link></Button></div></div><div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><ClipboardCheck className="size-5 text-emerald-800" /><form className="flex items-center gap-2" action="/attendance"><Input name="date" type="date" defaultValue={dateKey(selectedDate)} /><Button type="submit" variant="outline">View date</Button></form><span className="text-sm text-slate-600">{formatDate(selectedDate, { weekday: "long", month: "long", day: "numeric" })}</span></div><section className="mt-8 space-y-3">{schoolYear?.students.map((student) => { const record = student.attendanceRecords[0]; return <form key={student.id} action={recordAttendance} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_10rem_1fr_auto] sm:items-center"><input type="hidden" name="studentId" value={student.id} /><input type="hidden" name="date" value={dateKey(selectedDate)} /><div><p className="font-semibold text-slate-950">{student.name}</p><p className="text-sm text-slate-600">{student.grade} grade</p></div><select name="status" defaultValue={record?.status ?? "PRESENT"} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="PRESENT">Present</option><option value="ABSENT">Absent</option><option value="EXCUSED">Excused</option></select><Input name="notes" defaultValue={record?.notes ?? ""} placeholder="Notes (optional)" /><Button type="submit" size="sm">Save</Button></form>; })}{!schoolYear || schoolYear.students.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">Add students before recording attendance.</p> : null}</section></main>;
+}
